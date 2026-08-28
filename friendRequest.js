@@ -11,7 +11,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'friendRequestTribe',
         name: 'Friend Request + Tribe',
-        version: '1.0.0',
+        version: '1.1.0',
         author: 'Personal Mod',
         helpLink: '',
     },
@@ -53,7 +53,8 @@ $.getScript(
             await twSDK.init(scriptConfig);
 
             const scriptInfo = twSDK.scriptInfo();
-            const isValidScreen = twSDK.checkValidLocation('screen');
+            const isValidScreen =
+                twSDK.checkValidLocation('screen');
 
             if (isValidScreen) {
 
@@ -100,14 +101,47 @@ $.getScript(
 
         async function initMain() {
 
+            // Fetch players
             const players =
                 await twSDK.worldDataAPI('player');
 
+            // Fetch tribes
+            const allies =
+                await twSDK.worldDataAPI('ally');
+
+            // Fetch current friends
             const currentFriends =
                 fetchCurrentFriendsList();
 
 
-            // Sort by rank
+            // -----------------------------------------------------
+            // Create Tribe ID -> Tribe TAG map
+            // -----------------------------------------------------
+
+            const tribeMap = new Map();
+
+            allies.forEach((ally) => {
+
+                const tribeId =
+                    parseInt(ally[0]);
+
+                const tribeTag =
+                    ally[2];
+
+                if (
+                    !isNaN(tribeId) &&
+                    tribeTag
+                ) {
+
+                    tribeMap.set(
+                        tribeId,
+                        tribeTag
+                    );
+                }
+            });
+
+
+            // Sort players by rank
             const sortedPlayersByRank =
                 players.sort(
                     (a, b) => a[5] - b[5]
@@ -117,7 +151,8 @@ $.getScript(
             // Current friend IDs
             const currentFriendIds =
                 currentFriends.map(
-                    (friend) => parseInt(friend.id)
+                    (friend) =>
+                        parseInt(friend.id)
                 );
 
 
@@ -136,7 +171,8 @@ $.getScript(
             // Build table
             const playersTable =
                 buildPlayersTable(
-                    filteredPlayers
+                    filteredPlayers,
+                    tribeMap
                 );
 
 
@@ -150,7 +186,7 @@ $.getScript(
             const customStyle = `
                 .ra-mh400 {
                     overflow-y: auto;
-                    max-height: 400px;
+                    max-height: 500px;
                 }
 
                 .ra-existing-player td {
@@ -230,7 +266,10 @@ $.getScript(
         // BUILD TABLE
         // =========================================================
 
-        function buildPlayersTable(players) {
+        function buildPlayersTable(
+            players,
+            tribeMap
+        ) {
 
             let playersTable = `
                 <table
@@ -282,7 +321,7 @@ $.getScript(
                      *
                      * [0] ID
                      * [1] Name
-                     * [2] Tribe / Ally
+                     * [2] Tribe ID
                      * [3] Villages
                      * [4] Points
                      * [5] Rank
@@ -292,7 +331,7 @@ $.getScript(
                     const [
                         id,
                         name,
-                        ally,
+                        tribeId,
                         villages,
                         points,
                         rank,
@@ -309,20 +348,32 @@ $.getScript(
                         id
                     ) {
 
+                        // -------------------------------------------------
+                        // Convert Tribe ID -> Tribe TAG
+                        // -------------------------------------------------
+
+                        const tribeTag =
+                            tribeMap.get(
+                                parseInt(tribeId)
+                            );
+
+
                         let tribeHtml = '-';
 
 
-                        if (ally) {
+                        if (tribeTag) {
 
                             tribeHtml = `
                                 <a
                                     href="/game.php?screen=info_ally&tag=${encodeURIComponent(
-                                        ally
+                                        tribeTag
                                     )}"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
-                                    ${twSDK.cleanString(ally)}
+                                    ${twSDK.cleanString(
+                                        tribeTag
+                                    )}
                                 </a>
                             `;
                         }
@@ -350,7 +401,9 @@ $.getScript(
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
-                                        ${twSDK.cleanString(name)}
+                                        ${twSDK.cleanString(
+                                            name
+                                        )}
                                     </a>
 
                                 </td>
