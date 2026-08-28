@@ -1,17 +1,15 @@
 /*
- * Script: Friend Request + Tribe
- * Personal custom version
+ * Script: Friend Request
+ * Personal custom version | Coelh0z
  */
 
-// User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 
-// Script Config
 var scriptConfig = {
     scriptData: {
         prefix: 'friendRequestTribe',
         name: 'Friend Request + Tribe',
-        version: '1.1.0',
+        version: '1.2.0',
         author: 'Personal Mod',
         helpLink: '',
     },
@@ -42,23 +40,29 @@ var scriptConfig = {
     enableCountApi: true,
 };
 
-// Load twSDK
+
+// =============================================================
+// LOAD twSDK
+// =============================================================
+
 $.getScript(
     'https://twscripts.dev/scripts/twSDK.js',
     async function () {
 
         try {
 
-            // Initialize Library
             await twSDK.init(scriptConfig);
 
             const scriptInfo = twSDK.scriptInfo();
+
             const isValidScreen =
                 twSDK.checkValidLocation('screen');
+
 
             if (isValidScreen) {
 
                 try {
+
                     await initMain();
 
                 } catch (error) {
@@ -82,6 +86,7 @@ $.getScript(
                 twSDK.redirectTo('buddies');
             }
 
+
         } catch (error) {
 
             console.error(
@@ -101,44 +106,19 @@ $.getScript(
 
         async function initMain() {
 
-            // Fetch players
+            // Player data
             const players =
                 await twSDK.worldDataAPI('player');
 
-            // Fetch tribes
-            const allies =
-                await twSDK.worldDataAPI('ally');
 
-            // Fetch current friends
+            // Tribe data directly from ally.txt
+            const tribeMap =
+                await fetchTribeMap();
+
+
+            // Current friends
             const currentFriends =
                 fetchCurrentFriendsList();
-
-
-            // -----------------------------------------------------
-            // Create Tribe ID -> Tribe TAG map
-            // -----------------------------------------------------
-
-            const tribeMap = new Map();
-
-            allies.forEach((ally) => {
-
-                const tribeId =
-                    parseInt(ally[0]);
-
-                const tribeTag =
-                    ally[2];
-
-                if (
-                    !isNaN(tribeId) &&
-                    tribeTag
-                ) {
-
-                    tribeMap.set(
-                        tribeId,
-                        tribeTag
-                    );
-                }
-            });
 
 
             // Sort players by rank
@@ -148,7 +128,7 @@ $.getScript(
                 );
 
 
-            // Current friend IDs
+            // IDs of current friends
             const currentFriendIds =
                 currentFriends.map(
                     (friend) =>
@@ -199,7 +179,6 @@ $.getScript(
             `;
 
 
-            // Render widget
             twSDK.renderFixedWidget(
                 content,
                 'friendRequestTribe',
@@ -209,8 +188,133 @@ $.getScript(
             );
 
 
-            // Register buttons
             onClickAddFriend();
+        }
+
+
+        // =========================================================
+        // FETCH TRIBES DIRECTLY FROM /map/ally.txt
+        // =========================================================
+
+        async function fetchTribeMap() {
+
+            const tribeMap = new Map();
+
+
+            const allyUrl =
+                `${window.location.origin}/map/ally.txt`;
+
+
+            try {
+
+                const data =
+                    await jQuery.get(allyUrl);
+
+
+                const lines =
+                    data.trim().split(/\r?\n/);
+
+
+                lines.forEach(
+                    (line) => {
+
+                        if (!line.trim()) {
+                            return;
+                        }
+
+
+                        const fields =
+                            line.split(',');
+
+
+                        /*
+                         * ally.txt structure:
+                         *
+                         * [0] Tribe ID
+                         * [1] Tribe Name
+                         * [2] Tribe Tag
+                         * [3] Members
+                         * [4] Villages
+                         * [5] Points
+                         * [6] All Points
+                         * [7] Rank
+                         */
+
+
+                        const tribeId =
+                            parseInt(fields[0]);
+
+
+                        if (
+                            isNaN(tribeId) ||
+                            !fields[2]
+                        ) {
+                            return;
+                        }
+
+
+                        const tribeTag =
+                            decodeTWString(
+                                fields[2]
+                            );
+
+
+                        tribeMap.set(
+                            tribeId,
+                            tribeTag
+                        );
+                    }
+                );
+
+
+                console.log(
+                    'Friend Request + Tribe: Tribe map loaded',
+                    tribeMap
+                );
+
+
+                return tribeMap;
+
+
+            } catch (error) {
+
+                console.error(
+                    'Erro ao carregar /map/ally.txt:',
+                    error
+                );
+
+
+                return tribeMap;
+            }
+        }
+
+
+        // =========================================================
+        // DECODE TRIBAL WARS TEXT
+        // =========================================================
+
+        function decodeTWString(value) {
+
+            if (!value) {
+                return '';
+            }
+
+
+            try {
+
+                /*
+                 * Tribal Wars world data uses URL encoding.
+                 * Replace + with spaces before decoding.
+                 */
+
+                return decodeURIComponent(
+                    value.replace(/\+/g, ' ')
+                );
+
+            } catch (error) {
+
+                return value;
+            }
         }
 
 
@@ -263,7 +367,7 @@ $.getScript(
 
 
         // =========================================================
-        // BUILD TABLE
+        // BUILD PLAYERS TABLE
         // =========================================================
 
         function buildPlayersTable(
@@ -317,16 +421,17 @@ $.getScript(
                 (player) => {
 
                     /*
-                     * Player data:
+                     * player.txt structure:
                      *
-                     * [0] ID
-                     * [1] Name
+                     * [0] Player ID
+                     * [1] Player Name
                      * [2] Tribe ID
                      * [3] Villages
                      * [4] Points
                      * [5] Rank
                      * [6] Existing friend
                      */
+
 
                     const [
                         id,
@@ -348,10 +453,7 @@ $.getScript(
                         id
                     ) {
 
-                        // -------------------------------------------------
                         // Convert Tribe ID -> Tribe TAG
-                        // -------------------------------------------------
-
                         const tribeTag =
                             tribeMap.get(
                                 parseInt(tribeId)
@@ -440,7 +542,6 @@ $.getScript(
                                                     : ''
                                             }
                                         "
-
                                         data-href="/game.php?screen=info_player&id=${id}&action=add_friend&h=${hash}"
                                     >
                                         ${twSDK.tt(
@@ -459,7 +560,6 @@ $.getScript(
 
             playersTable += `
                     </tbody>
-
                 </table>
             `;
 
@@ -477,21 +577,18 @@ $.getScript(
             const currentFriends = [];
 
 
-            // Current friends
             const currentFriendsTable =
                 jQuery(
                     '#content_value > table:nth-child(6) > tbody > tr'
                 ).not(':eq(0)');
 
 
-            // Sent requests
             const friendRequestsTable =
                 jQuery(
                     '#content_value > table:nth-child(8) > tbody > tr'
                 ).not(':eq(0)');
 
 
-            // Incoming requests
             const incomingFriendsTable =
                 jQuery(
                     '#content_value > table:nth-child(10) > tbody > tr'
@@ -518,7 +615,9 @@ $.getScript(
                             .attr('href');
 
 
-                    if (!playerLink) return;
+                    if (!playerLink) {
+                        return;
+                    }
 
 
                     const playerId =
@@ -560,7 +659,9 @@ $.getScript(
                             .attr('href');
 
 
-                    if (!playerLink) return;
+                    if (!playerLink) {
+                        return;
+                    }
 
 
                     const playerId =
@@ -602,7 +703,9 @@ $.getScript(
                             .attr('href');
 
 
-                    if (!playerLink) return;
+                    if (!playerLink) {
+                        return;
+                    }
 
 
                     const playerId =
