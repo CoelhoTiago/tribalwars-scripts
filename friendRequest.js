@@ -1,6 +1,6 @@
 /*
- * Script: Friend Request
- * Personal custom version | Coelh0z
+ * Script: Friend Request + Tribe
+ * Personal custom version
  */
 
 if (typeof DEBUG !== 'boolean') DEBUG = false;
