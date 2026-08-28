@@ -1,6 +1,7 @@
 /*
  * Script: Friend Request + Tribe
  * Personal custom version
+ * Version: 1.3.0
  */
 
 if (typeof DEBUG !== 'boolean') DEBUG = false;
@@ -9,7 +10,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'friendRequestTribe',
         name: 'Friend Request + Tribe',
-        version: '1.2.0',
+        version: '1.3.0',
         author: 'Personal Mod',
         helpLink: '',
     },
@@ -55,14 +56,9 @@ $.getScript(
 
             const scriptInfo = twSDK.scriptInfo();
 
-            const isValidScreen =
-                twSDK.checkValidLocation('screen');
-
-
-            if (isValidScreen) {
+            if (twSDK.checkValidLocation('screen')) {
 
                 try {
-
                     await initMain();
 
                 } catch (error) {
@@ -86,7 +82,6 @@ $.getScript(
                 twSDK.redirectTo('buddies');
             }
 
-
         } catch (error) {
 
             console.error(
@@ -94,9 +89,7 @@ $.getScript(
                 error
             );
 
-            alert(
-                'Erro ao carregar o twSDK.'
-            );
+            alert('Erro ao carregar o twSDK.');
         }
 
 
@@ -111,7 +104,7 @@ $.getScript(
                 await twSDK.worldDataAPI('player');
 
 
-            // Tribe data directly from ally.txt
+            // Tribe data
             const tribeMap =
                 await fetchTribeMap();
 
@@ -121,37 +114,37 @@ $.getScript(
                 fetchCurrentFriendsList();
 
 
-            // Sort players by rank
-            const sortedPlayersByRank =
+            // Sort by rank
+            const sortedPlayers =
                 players.sort(
                     (a, b) => a[5] - b[5]
                 );
 
 
-            // IDs of current friends
+            // IDs of existing friends
             const currentFriendIds =
                 currentFriends.map(
-                    (friend) =>
-                        parseInt(friend.id)
+                    friend => parseInt(friend.id)
                 );
 
 
             // Mark existing friends
-            const filteredPlayers =
-                sortedPlayersByRank.filter(
-                    (player) =>
-                        player.push(
-                            currentFriendIds.includes(
-                                parseInt(player[0])
-                            )
+            sortedPlayers.forEach(
+                player => {
+
+                    player.push(
+                        currentFriendIds.includes(
+                            parseInt(player[0])
                         )
-                );
+                    );
+                }
+            );
 
 
             // Build table
             const playersTable =
                 buildPlayersTable(
-                    filteredPlayers,
+                    sortedPlayers,
                     tribeMap
                 );
 
@@ -193,22 +186,21 @@ $.getScript(
 
 
         // =========================================================
-        // FETCH TRIBES DIRECTLY FROM /map/ally.txt
+        // LOAD /map/ally.txt
         // =========================================================
 
         async function fetchTribeMap() {
 
             const tribeMap = new Map();
 
-
-            const allyUrl =
+            const url =
                 `${window.location.origin}/map/ally.txt`;
 
 
             try {
 
                 const data =
-                    await jQuery.get(allyUrl);
+                    await jQuery.get(url);
 
 
                 const lines =
@@ -216,23 +208,19 @@ $.getScript(
 
 
                 lines.forEach(
-                    (line) => {
+                    line => {
 
                         if (!line.trim()) {
                             return;
                         }
 
 
-                        const fields =
-                            line.split(',');
-
-
                         /*
-                         * ally.txt structure:
+                         * ally.txt:
                          *
                          * [0] Tribe ID
                          * [1] Tribe Name
-                         * [2] Tribe Tag
+                         * [2] Tribe TAG
                          * [3] Members
                          * [4] Villages
                          * [5] Points
@@ -241,39 +229,40 @@ $.getScript(
                          */
 
 
+                        const fields =
+                            line.split(',');
+
+
                         const tribeId =
-                            parseInt(fields[0]);
-
-
-                        if (
-                            isNaN(tribeId) ||
-                            !fields[2]
-                        ) {
-                            return;
-                        }
-
-
-                        const tribeTag =
-                            decodeTWString(
-                                fields[2]
+                            parseInt(
+                                fields[0]
                             );
 
 
-                        tribeMap.set(
-                            tribeId,
+                        const tribeTag =
+                            fields[2];
+
+
+                        if (
+                            !isNaN(tribeId) &&
                             tribeTag
-                        );
+                        ) {
+
+                            tribeMap.set(
+                                tribeId,
+                                decodeTWString(
+                                    tribeTag
+                                )
+                            );
+                        }
                     }
                 );
 
 
                 console.log(
-                    'Friend Request + Tribe: Tribe map loaded',
+                    'Friend Request + Tribe - Tribe Map:',
                     tribeMap
                 );
-
-
-                return tribeMap;
 
 
             } catch (error) {
@@ -282,10 +271,10 @@ $.getScript(
                     'Erro ao carregar /map/ally.txt:',
                     error
                 );
-
-
-                return tribeMap;
             }
+
+
+            return tribeMap;
         }
 
 
@@ -301,11 +290,6 @@ $.getScript(
 
 
             try {
-
-                /*
-                 * Tribal Wars world data uses URL encoding.
-                 * Replace + with spaces before decoding.
-                 */
 
                 return decodeURIComponent(
                     value.replace(/\+/g, ' ')
@@ -367,7 +351,7 @@ $.getScript(
 
 
         // =========================================================
-        // BUILD PLAYERS TABLE
+        // BUILD TABLE
         // =========================================================
 
         function buildPlayersTable(
@@ -375,7 +359,7 @@ $.getScript(
             tribeMap
         ) {
 
-            let playersTable = `
+            let html = `
                 <table
                     class="ra-table"
                     width="100%"
@@ -418,20 +402,7 @@ $.getScript(
 
 
             players.forEach(
-                (player) => {
-
-                    /*
-                     * player.txt structure:
-                     *
-                     * [0] Player ID
-                     * [1] Player Name
-                     * [2] Tribe ID
-                     * [3] Villages
-                     * [4] Points
-                     * [5] Rank
-                     * [6] Existing friend
-                     */
-
+                player => {
 
                     const [
                         id,
@@ -444,127 +415,140 @@ $.getScript(
                     ] = player;
 
 
-                    const hash =
-                        game_data.csrf;
-
-
                     if (
-                        name !== undefined &&
-                        id
+                        name === undefined ||
+                        !id
                     ) {
-
-                        // Convert Tribe ID -> Tribe TAG
-                        const tribeTag =
-                            tribeMap.get(
-                                parseInt(tribeId)
-                            );
+                        return;
+                    }
 
 
-                        let tribeHtml = '-';
+                    /*
+                     * IMPORTANT:
+                     *
+                     * player.txt gives us the Tribe ID.
+                     *
+                     * Example:
+                     *
+                     * DeeJay -> 40
+                     *
+                     * We use that ID to search tribeMap.
+                     *
+                     * 40 -> KZD.
+                     */
 
 
-                        if (tribeTag) {
+                    const tribeTag =
+                        tribeMap.get(
+                            parseInt(tribeId)
+                        );
 
-                            tribeHtml = `
+
+                    let tribeHtml = '-';
+
+
+                    if (tribeTag) {
+
+                        tribeHtml = `
+                            <a
+                                href="/game.php?screen=info_ally&tag=${encodeURIComponent(
+                                    tribeTag
+                                )}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                ${twSDK.cleanString(
+                                    tribeTag
+                                )}
+                            </a>
+                        `;
+                    }
+
+
+                    html += `
+
+                        <tr
+                            class="${
+                                existing
+                                    ? 'ra-existing-player'
+                                    : ''
+                            }"
+                        >
+
+                            <td>
+                                ${rank}
+                            </td>
+
+
+                            <td class="ra-tal">
+
                                 <a
-                                    href="/game.php?screen=info_ally&tag=${encodeURIComponent(
-                                        tribeTag
-                                    )}"
+                                    href="/game.php?screen=info_player&id=${id}"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
                                     ${twSDK.cleanString(
-                                        tribeTag
+                                        name
                                     )}
                                 </a>
-                            `;
-                        }
+
+                            </td>
 
 
-                        playersTable += `
-
-                            <tr
-                                class="${
-                                    existing
-                                        ? 'ra-existing-player'
-                                        : ''
-                                }"
-                            >
-
-                                <td>
-                                    ${rank}
-                                </td>
+                            <td class="ra-tal">
+                                ${tribeHtml}
+                            </td>
 
 
-                                <td class="ra-tal">
-
-                                    <a
-                                        href="/game.php?screen=info_player&id=${id}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        ${twSDK.cleanString(
-                                            name
-                                        )}
-                                    </a>
-
-                                </td>
+                            <td>
+                                ${twSDK.formatAsNumber(
+                                    villages
+                                )}
+                            </td>
 
 
-                                <td class="ra-tal">
-                                    ${tribeHtml}
-                                </td>
+                            <td>
+                                ${twSDK.formatAsNumber(
+                                    points
+                                )}
+                            </td>
 
 
-                                <td>
-                                    ${twSDK.formatAsNumber(
-                                        villages
+                            <td>
+
+                                <span
+                                    class="
+                                        btn
+                                        btn-add-friend
+                                        ${
+                                            existing
+                                                ? 'btn-disabled'
+                                                : ''
+                                        }
+                                    "
+
+                                    data-href="/game.php?screen=info_player&id=${id}&action=add_friend&h=${game_data.csrf}"
+                                >
+                                    ${twSDK.tt(
+                                        'Add as friend'
                                     )}
-                                </td>
+                                </span>
 
+                            </td>
 
-                                <td>
-                                    ${twSDK.formatAsNumber(
-                                        points
-                                    )}
-                                </td>
-
-
-                                <td>
-
-                                    <span
-                                        class="
-                                            btn
-                                            btn-add-friend
-                                            ${
-                                                existing
-                                                    ? 'btn-disabled'
-                                                    : ''
-                                            }
-                                        "
-                                        data-href="/game.php?screen=info_player&id=${id}&action=add_friend&h=${hash}"
-                                    >
-                                        ${twSDK.tt(
-                                            'Add as friend'
-                                        )}
-                                    </span>
-
-                                </td>
-
-                            </tr>
-                        `;
-                    }
+                        </tr>
+                    `;
                 }
             );
 
 
-            playersTable += `
+            html += `
                     </tbody>
                 </table>
             `;
 
 
-            return playersTable;
+            return html;
         }
 
 
@@ -595,133 +579,88 @@ $.getScript(
                 ).not(':eq(0)');
 
 
-            // -----------------------------------------------------
             // Current friends
-            // -----------------------------------------------------
-
             currentFriendsTable.each(
                 function () {
 
-                    const playerName =
-                        jQuery(this)
-                            .find('td:eq(1)')
-                            .text()
-                            .trim();
-
-
-                    const playerLink =
+                    const link =
                         jQuery(this)
                             .find('td:eq(1) a')
                             .attr('href');
 
 
-                    if (!playerLink) {
+                    if (!link) {
                         return;
                     }
 
 
-                    const playerId =
+                    const id =
                         twSDK.getParameterByName(
                             'id',
-                            window.location.origin +
-                                playerLink
+                            window.location.origin + link
                         );
 
 
                     currentFriends.push({
-
-                        id: parseInt(playerId),
-
-                        name: playerName,
-
+                        id: parseInt(id),
                     });
                 }
             );
 
 
-            // -----------------------------------------------------
             // Sent requests
-            // -----------------------------------------------------
-
             friendRequestsTable.each(
                 function () {
 
-                    const playerName =
-                        jQuery(this)
-                            .find('td:eq(0)')
-                            .text()
-                            .trim();
-
-
-                    const playerLink =
+                    const link =
                         jQuery(this)
                             .find('td:eq(0) a')
                             .attr('href');
 
 
-                    if (!playerLink) {
+                    if (!link) {
                         return;
                     }
 
 
-                    const playerId =
+                    const id =
                         twSDK.getParameterByName(
                             'id',
-                            window.location.origin +
-                                playerLink
+                            window.location.origin + link
                         );
 
 
                     currentFriends.push({
-
-                        id: parseInt(playerId),
-
-                        name: playerName,
-
+                        id: parseInt(id),
                     });
                 }
             );
 
 
-            // -----------------------------------------------------
             // Incoming requests
-            // -----------------------------------------------------
-
             incomingFriendsTable.each(
                 function () {
 
-                    const playerName =
-                        jQuery(this)
-                            .find('td:eq(0)')
-                            .text()
-                            .trim();
-
-
-                    const playerLink =
+                    const link =
                         jQuery(this)
                             .find('td:eq(0) a')
                             .attr('href');
 
 
-                    if (!playerLink) {
+                    if (!link) {
                         return;
                     }
 
 
-                    const playerId =
+                    const id =
                         twSDK.getParameterByName(
                             'id',
-                            window.location.origin +
-                                playerLink
+                            window.location.origin + link
                         );
 
 
                     currentFriends.push({
-
-                        id: parseInt(playerId),
-
-                        name: playerName,
-
+                        id: parseInt(id),
                     });
                 }
             );
